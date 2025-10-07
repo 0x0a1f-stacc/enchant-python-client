@@ -32,6 +32,11 @@ Repository = "https://github.com/0x0a1f-stacc/enchant-python-client"
 Issues = "https://github.com/0x0a1f-stacc/enchant-python-client/issues"
 Changelog = "https://github.com/0x0a1f-stacc/enchant-python-client/blob/main/CHANGELOG.md"
 
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+]
+
 [tool.uv.build-backend]
 module-name = "enchant_python_client"
 module-root = ""
