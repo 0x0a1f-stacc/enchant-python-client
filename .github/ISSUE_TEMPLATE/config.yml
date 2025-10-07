@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Enchant Official Support
+    url: https://www.enchant.com/
+    about: For official Enchant support (this is an unofficial client)
+  - name: Enchant API Documentation
+    url: https://dev.enchant.com/api/v1
+    about: Official Enchant REST API documentation

@@ -1,0 +1,1868 @@
+openapi: 3.0.0
+info:
+  title: Enchant API (Unofficial Specification)
+  description: |
+    Unofficial OpenAPI specification for the Enchant.com API.
+    
+    This specification was created by analyzing publicly available 
+    API documentation at https://dev.enchant.com/api/v1
+    
+    **Disclaimer**: This is not an official specification from Senvee Inc/Enchant.com.
+    It is maintained by the community for the purpose of generating API clients
+    and tools. For authoritative API documentation, please refer to 
+    https://dev.enchant.com
+    
+  version: 1.0.0
+  contact:
+    name: Alfredo Ruiz
+    email: alfredo@globalvoice.mx
+    url: https://github.com/0x0a1f-stacc/enchant-python-client
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+externalDocs:
+  description: Developer docs
+  url: https://dev.enchant.com/api/v1
+servers:
+  - url: https://{site}.enchant.com/api/v1
+    description: Primary server (replace {site} with your help desk identifier)
+    variables:
+      site:
+        default: site
+        description: Your help desk subdomain
+security:
+  - BearerAuth: []
+  - BasicAuth: []
+tags:
+  - name: Tickets
+    description: Ticket operations
+  - name: Messages
+    description: Ticket message operations
+  - name: Attachments
+    description: Attachment upload and retrieval
+  - name: Users
+    description: Help desk users
+  - name: Customers
+    description: Customer records
+  - name: Contacts
+    description: Customer contacts (email, phone, twitter)
+  - name: System
+    description: 'Common patterns: pagination, sorting, embedding, counting, enveloping'
+paths:
+  /tickets:
+    get:
+      tags:
+        - Tickets
+      summary: List tickets
+      operationId: listTickets
+      description: Returns tickets. Supports filtering, pagination, sorting, field filtering, counting and enveloping.
+      parameters:
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/envelope'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/tickets.sort'
+        - $ref: '#/components/parameters/tickets.id'
+        - $ref: '#/components/parameters/tickets.inbox_id'
+        - $ref: '#/components/parameters/tickets.state'
+        - $ref: '#/components/parameters/tickets.user_id'
+        - $ref: '#/components/parameters/tickets.label_id'
+        - $ref: '#/components/parameters/tickets.type'
+        - $ref: '#/components/parameters/tickets.spam'
+        - $ref: '#/components/parameters/tickets.trash'
+        - $ref: '#/components/parameters/since_created_at'
+        - $ref: '#/components/parameters/since_updated_at'
+      responses:
+        '200':
+          description: Tickets fetched.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+            Total-Count:
+              $ref: '#/components/headers/Total-Count'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Ticket'
+                  - $ref: '#/components/schemas/Envelope'
+              examples:
+                unassignedOnePerPage:
+                  summary: Unassigned tickets example
+                  value:
+                    - id: 51e6e9
+                      number: 2209
+                      user_id: null
+                      state: closed
+                      subject: help, it didn't work!
+                      label_ids:
+                        - 41e3dc
+                      customer_id: 51b3e9
+                      type: email
+                      inbox_id: 51e3f9
+                      spam: false
+                      trash: false
+                      updated_at: '2023-07-25T12:19:33Z'
+                      created_at: '2023-07-17T18:58:44Z'
+                      summary: I was trying to do something and it just didn't work.  Can you help?
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+        - Tickets
+      summary: Create a ticket
+      operationId: createTicket
+      description: Creates a new ticket. Only `email` tickets can be created via the public API. Optionally creates initial messages with the ticket.
+      parameters:
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/envelope'
+        - $ref: '#/components/parameters/methodOverride'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketCreate'
+            examples:
+              contactForm:
+                summary: Create ticket from contact form with note + inbound message
+                value:
+                  customer:
+                    first_name: John
+                    last_name: Smith
+                    contacts:
+                      - type: email
+                        value: john@example.com
+                  messages:
+                    - type: note
+                      user_id: '6130e332'
+                      body: 'IP address: 1.2.3.4, Page: https://site.com/page'
+                    - type: reply
+                      direction: in
+                      from_name: John Smith
+                      from: john@example.com
+                      htmlized: false
+                      body: My package didn't arrive. Help!
+                  type: email
+                  user_id: 522aaa
+                  inbox_id: 533bcd
+                  subject: Where's my package?
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '201':
+          description: Ticket created. URL to new resource in Location header.
+          headers:
+            Location:
+              description: URL of the created ticket
+              schema:
+                type: string
+                format: uri
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              examples:
+                created:
+                  value:
+                    id: 51f6e9
+                    number: 2210
+                    user_id: 522aaa
+                    state: open
+                    subject: Where's my package?
+                    label_ids: []
+                    customer_id: 4332ca
+                    type: email
+                    inbox_id: 533bcd
+                    spam: false
+                    trash: false
+                    updated_at: '2023-07-17T18:58:44Z'
+                    created_at: '2023-07-17T18:58:44Z'
+                    summary: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /tickets/{ticket_id}:
+    get:
+      tags:
+        - Tickets
+      summary: Get a ticket
+      operationId: getTicket
+      parameters:
+        - $ref: '#/components/parameters/ticket_id'
+        - $ref: '#/components/parameters/ticket.embed'
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/envelope'
+      responses:
+        '200':
+          description: Ticket retrieved.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TicketWithEmbeds'
+                  - $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags:
+        - Tickets
+      summary: Update a ticket
+      operationId: updateTicket
+      parameters:
+        - $ref: '#/components/parameters/ticket_id'
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/envelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketUpdate'
+      responses:
+        '200':
+          description: Ticket updated.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Ticket'
+                  - $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /tickets/{ticket_id}/labels/{label_ids}:
+    put:
+      tags:
+        - Tickets
+      summary: Add one or more labels to a ticket
+      operationId: addLabelsToTicket
+      parameters:
+        - $ref: '#/components/parameters/ticket_id'
+        - $ref: '#/components/parameters/label_ids'
+        - $ref: '#/components/parameters/envelope'
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '204':
+          description: Labels added (no content).
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags:
+        - Tickets
+      summary: Remove one or more labels from a ticket
+      operationId: removeLabelsFromTicket
+      parameters:
+        - $ref: '#/components/parameters/ticket_id'
+        - $ref: '#/components/parameters/label_ids'
+        - $ref: '#/components/parameters/envelope'
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '204':
+          description: Labels removed (no content).
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /tickets/{ticket_id}/messages:
+    post:
+      tags:
+        - Messages
+      summary: Create a message on a ticket
+      operationId: createMessage
+      description: Creates a note, an inbound reply, or an outbound reply on the given ticket. Attachments must be uploaded first and referenced by `attachment_ids`.
+      parameters:
+        - $ref: '#/components/parameters/ticket_id'
+        - $ref: '#/components/parameters/envelope'
+        - $ref: '#/components/parameters/methodOverride'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreate'
+            examples:
+              inboundReply:
+                value:
+                  direction: in
+                  type: reply
+                  from_name: Chris Example
+                  from: chris@example.com
+                  htmlized: false
+                  body: Thank you for your help!
+              outboundReply:
+                value:
+                  direction: out
+                  type: reply
+                  to: chris@example.com
+                  body: Hi Chris, I can help! Here's what you need to do ...
+                  htmlized: false
+                  user_id: 501efc
+              note:
+                value:
+                  type: note
+                  body: Attaching the file!
+                  htmlized: false
+                  user_id: 501efc
+                  attachment_ids:
+                    - 5338df
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '201':
+          description: Message created.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /attachments/{attachment_id}:
+    get:
+      tags:
+        - Attachments
+      summary: Get an attachment
+      operationId: getAttachment
+      parameters:
+        - name: attachment_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/envelope'
+      responses:
+        '200':
+          description: Attachment metadata.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Attachment'
+                  - $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /attachments:
+    post:
+      tags:
+        - Attachments
+      summary: Create (upload) an attachment
+      operationId: createAttachment
+      parameters:
+        - $ref: '#/components/parameters/envelope'
+        - $ref: '#/components/parameters/methodOverride'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachmentCreate'
+            examples:
+              upload:
+                value:
+                  name: MyFile.zip
+                  type: application/zip
+                  data: UEsDBAoAAAAAAFmu/kLPx4wKGwAAABsAAAAKABwAcmVhZG1lLnR4dFVUCQADOjX4UTo1+FF1eAsAAQToAwAABOgDAABNYXkgdGhlIGZvcmNlIGJlIHdpdGggeW91LgpQSwECHgMKAAAAAABZrv5Cz8eMChsAAAAbAAAACgAYAAAAAAABAAAAtIEAAAAAcmVhZG1lLnR4dFVUBQADOjX4UXV4CwABBOgDAAAE6AMAAFBLBQYAAAAAAQABAFAAAABfAAAAAAA=
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '201':
+          description: Attachment created.
+          headers:
+            Location:
+              description: URL of the created attachment
+              schema:
+                type: string
+                format: uri
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List users
+      operationId: listUsers
+      parameters:
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/envelope'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Users fetched.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+            Total-Count:
+              $ref: '#/components/headers/Total-Count'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  - $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /customers:
+    get:
+      tags:
+        - Customers
+      summary: List customers
+      operationId: listCustomers
+      parameters:
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/envelope'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/since_created_at'
+        - $ref: '#/components/parameters/sort'
+        - name: contacts.type
+          in: query
+          description: Filter by contact type
+          schema:
+            $ref: '#/components/schemas/ContactType'
+        - name: contacts.value
+          in: query
+          description: Filter by contact value (email address or twitter screen name)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Customers fetched.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+            Total-Count:
+              $ref: '#/components/headers/Total-Count'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+                  - $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+        - Customers
+      summary: Create a customer
+      operationId: createCustomer
+      parameters:
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/envelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '201':
+          description: Customer created.
+          headers:
+            Location:
+              description: URL of the created customer
+              schema:
+                type: string
+                format: uri
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /customers/{customer_id}:
+    get:
+      tags:
+        - Customers
+      summary: Get a customer
+      operationId: getCustomer
+      parameters:
+        - $ref: '#/components/parameters/customer_id'
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/envelope'
+      responses:
+        '200':
+          description: Customer retrieved.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Customer'
+                  - $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags:
+        - Customers
+      summary: Update a customer
+      operationId: updateCustomer
+      parameters:
+        - $ref: '#/components/parameters/customer_id'
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/envelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+      responses:
+        '200':
+          description: Customer updated.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /customers/{customer_id}/contacts:
+    post:
+      tags:
+        - Contacts
+      summary: Create a contact for a customer
+      operationId: createContact
+      parameters:
+        - $ref: '#/components/parameters/customer_id'
+        - $ref: '#/components/parameters/envelope'
+        - $ref: '#/components/parameters/methodOverride'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactCreate'
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '201':
+          description: Contact created.
+          headers:
+            Location:
+              description: URL of the created contact
+              schema:
+                type: string
+                format: uri
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+  /customers/{customer_id}/contacts/{contact_id}:
+    delete:
+      tags:
+        - Contacts
+      summary: Delete a contact for a customer
+      operationId: deleteContact
+      parameters:
+        - $ref: '#/components/parameters/customer_id'
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/envelope'
+      responses:
+        '200':
+          description: Envelope response when `envelope=true` is provided.
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '204':
+          description: Contact deleted (no content).
+          headers:
+            Rate-Limit-Limit:
+              $ref: '#/components/headers/Rate-Limit-Limit'
+            Rate-Limit-Remaining:
+              $ref: '#/components/headers/Rate-Limit-Remaining'
+            Rate-Limit-Used:
+              $ref: '#/components/headers/Rate-Limit-Used'
+            Rate-Limit-Reset:
+              $ref: '#/components/headers/Rate-Limit-Reset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/ServerError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Bearer token
+      description: 'Provide the API access token as a bearer token: `Authorization: Bearer <token>`.'
+    BasicAuth:
+      type: http
+      scheme: basic
+      description: For clients that cannot send Bearer tokens, pass the access token as the username and any dummy password.
+  headers:
+    Rate-Limit-Limit:
+      description: Total credits for the current period.
+      schema:
+        type: integer
+        minimum: 0
+    Rate-Limit-Remaining:
+      description: Remaining credits in the current period.
+      schema:
+        type: integer
+        minimum: 0
+    Rate-Limit-Used:
+      description: Credits used by this request.
+      schema:
+        type: integer
+        minimum: 0
+    Rate-Limit-Reset:
+      description: Seconds until credit count resets.
+      schema:
+        type: integer
+        minimum: 0
+    Total-Count:
+      description: Total number of items available when `count=true`.
+      schema:
+        type: integer
+        minimum: 0
+  parameters:
+    ticket_id:
+      name: ticket_id
+      in: path
+      required: true
+      schema:
+        type: string
+    customer_id:
+      name: customer_id
+      in: path
+      required: true
+      schema:
+        type: string
+    label_ids:
+      name: label_ids
+      in: path
+      required: true
+      description: Comma-separated label ids to add or remove.
+      style: simple
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+        minItems: 1
+    fields:
+      name: fields
+      in: query
+      description: Restrict response to the specified fields (comma-separated).
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+    count:
+      name: count
+      in: query
+      description: If true, returns `Total-Count` header.
+      schema:
+        type: boolean
+        default: false
+    envelope:
+      name: envelope
+      in: query
+      description: If true, wraps the result in an envelope and always returns HTTP 200.
+      schema:
+        type: boolean
+        default: false
+    page:
+      name: page
+      in: query
+      description: Page number starting from 1.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    per_page:
+      name: per_page
+      in: query
+      description: Items per page (0–100, default 10).
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 100
+        default: 10
+    since_created_at:
+      name: since_created_at
+      in: query
+      description: Filter to resources created at or after this UTC ISO-8601 timestamp.
+      schema:
+        type: string
+        format: date-time
+    since_updated_at:
+      name: since_updated_at
+      in: query
+      description: Filter to resources updated at or after this UTC ISO-8601 timestamp.
+      schema:
+        type: string
+        format: date-time
+    methodOverride:
+      name: X-HTTP-Method-Override
+      in: header
+      description: Use with POST if the client cannot send PUT, PATCH, or DELETE.
+      required: false
+      schema:
+        type: string
+        enum:
+          - PUT
+          - PATCH
+          - DELETE
+    tickets.id:
+      name: id
+      in: query
+      description: Comma-separated list of ticket ids.
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+    tickets.inbox_id:
+      name: inbox_id
+      in: query
+      description: Comma-separated list of inbox ids.
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+    tickets.user_id:
+      name: user_id
+      in: query
+      description: Comma-separated list of user ids. Use `null` to find unassigned tickets.
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+          nullable: true
+    tickets.label_id:
+      name: label_id
+      in: query
+      description: Comma-separated list of label ids.
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+    tickets.state:
+      name: state
+      in: query
+      description: Comma-separated list of ticket states to filter.
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - open
+            - hold
+            - closed
+    tickets.type:
+      name: type
+      in: query
+      description: Comma-separated list of ticket types.
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/TicketType'
+    tickets.spam:
+      name: spam
+      in: query
+      description: Filter by spam flag.
+      schema:
+        type: boolean
+    tickets.trash:
+      name: trash
+      in: query
+      description: Filter by trash flag.
+      schema:
+        type: boolean
+    tickets.sort:
+      name: sort
+      in: query
+      description: Sort order.
+      schema:
+        type: string
+        enum:
+          - updated_at
+          - '-updated_at'
+          - created_at
+          - '-created_at'
+          - user_id,-updated_at
+        default: '-created_at'
+    sort:
+      name: sort
+      in: query
+      description: Sort customers.
+      schema:
+        type: string
+        enum:
+          - created_at
+        default: created_at
+    ticket.embed:
+      name: embed
+      in: query
+      description: Embed related resources to minimize API round-trips. Includes deprecated `group` option for backwards compatibility.
+      style: form
+      explode: false
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - user
+            - inbox
+            - customer
+            - labels
+            - messages
+            - group
+  responses:
+    BadRequest:
+      description: Bad request.
+      headers:
+        Rate-Limit-Limit:
+          $ref: '#/components/headers/Rate-Limit-Limit'
+        Rate-Limit-Remaining:
+          $ref: '#/components/headers/Rate-Limit-Remaining'
+        Rate-Limit-Used:
+          $ref: '#/components/headers/Rate-Limit-Used'
+        Rate-Limit-Reset:
+          $ref: '#/components/headers/Rate-Limit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized (no or invalid credentials).
+      headers:
+        Rate-Limit-Limit:
+          $ref: '#/components/headers/Rate-Limit-Limit'
+        Rate-Limit-Remaining:
+          $ref: '#/components/headers/Rate-Limit-Remaining'
+        Rate-Limit-Used:
+          $ref: '#/components/headers/Rate-Limit-Used'
+        Rate-Limit-Reset:
+          $ref: '#/components/headers/Rate-Limit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden (insufficient permissions).
+      headers:
+        Rate-Limit-Limit:
+          $ref: '#/components/headers/Rate-Limit-Limit'
+        Rate-Limit-Remaining:
+          $ref: '#/components/headers/Rate-Limit-Remaining'
+        Rate-Limit-Used:
+          $ref: '#/components/headers/Rate-Limit-Used'
+        Rate-Limit-Reset:
+          $ref: '#/components/headers/Rate-Limit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found.
+      headers:
+        Rate-Limit-Limit:
+          $ref: '#/components/headers/Rate-Limit-Limit'
+        Rate-Limit-Remaining:
+          $ref: '#/components/headers/Rate-Limit-Remaining'
+        Rate-Limit-Used:
+          $ref: '#/components/headers/Rate-Limit-Used'
+        Rate-Limit-Reset:
+          $ref: '#/components/headers/Rate-Limit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnsupportedMediaType:
+      description: Unsupported Media Type (use application/json).
+      headers:
+        Rate-Limit-Limit:
+          $ref: '#/components/headers/Rate-Limit-Limit'
+        Rate-Limit-Remaining:
+          $ref: '#/components/headers/Rate-Limit-Remaining'
+        Rate-Limit-Used:
+          $ref: '#/components/headers/Rate-Limit-Used'
+        Rate-Limit-Reset:
+          $ref: '#/components/headers/Rate-Limit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationFailed:
+      description: Validation failed.
+      headers:
+        Rate-Limit-Limit:
+          $ref: '#/components/headers/Rate-Limit-Limit'
+        Rate-Limit-Remaining:
+          $ref: '#/components/headers/Rate-Limit-Remaining'
+        Rate-Limit-Used:
+          $ref: '#/components/headers/Rate-Limit-Used'
+        Rate-Limit-Reset:
+          $ref: '#/components/headers/Rate-Limit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    TooManyRequests:
+      description: Too many requests (rate limited).
+      headers:
+        Rate-Limit-Limit:
+          $ref: '#/components/headers/Rate-Limit-Limit'
+        Rate-Limit-Remaining:
+          $ref: '#/components/headers/Rate-Limit-Remaining'
+        Rate-Limit-Used:
+          $ref: '#/components/headers/Rate-Limit-Used'
+        Rate-Limit-Reset:
+          $ref: '#/components/headers/Rate-Limit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: Internal server error (5xx). Does not return a JSON body.
+  schemas:
+    Envelope:
+      type: object
+      description: Envelope wrapper returned when `envelope=true` is used. The actual response is in the `response` property.
+      properties:
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        headers:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: integer
+          properties:
+            Rate-Limit-Limit:
+              type: integer
+            Rate-Limit-Remaining:
+              type: integer
+            Rate-Limit-Used:
+              type: integer
+            Rate-Limit-Reset:
+              type: integer
+        response:
+          description: Original response payload.
+          type: object
+          additionalProperties: true
+      required:
+        - status
+        - headers
+        - response
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          default: Validation Failed
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+            required:
+              - message
+      required:
+        - message
+        - errors
+    TicketType:
+      type: string
+      enum:
+        - email
+        - twitter
+        - twitter_dm
+        - phone
+        - chat
+        - web
+        - sms
+        - whatsapp
+        - fb_messenger
+        - instagram_dm
+        - call
+    TicketState:
+      type: string
+      enum:
+        - open
+        - hold
+        - closed
+        - snoozed
+        - archived
+    Ticket:
+      type: object
+      description: Ticket resource.
+      properties:
+        id:
+          type: string
+        number:
+          type: integer
+          description: Friendly ticket number, unique across the help desk.
+        customer_id:
+          type: string
+        user_id:
+          type: string
+          nullable: true
+          description: Assigned user id. Can be null.
+        inbox_id:
+          type: string
+          description: Associated inbox id.
+        label_ids:
+          type: array
+          items:
+            type: string
+        state:
+          $ref: '#/components/schemas/TicketState'
+        snoozed_until:
+          type: string
+          format: date-time
+          nullable: true
+        subject:
+          type: string
+        type:
+          $ref: '#/components/schemas/TicketType'
+        spam:
+          type: boolean
+        trash:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        reply_to:
+          type: string
+          deprecated: true
+          nullable: true
+          description: 'DEPRECATED. Default To: field of a new reply.'
+        reply_cc:
+          type: string
+          deprecated: true
+          nullable: true
+          description: 'DEPRECATED. Default Cc: field of a new reply.'
+        summary:
+          type: string
+          nullable: true
+      required:
+        - id
+        - number
+        - customer_id
+        - inbox_id
+        - state
+        - type
+        - spam
+        - trash
+        - updated_at
+        - created_at
+        - label_ids
+        - subject
+    TicketWithEmbeds:
+      allOf:
+        - $ref: '#/components/schemas/Ticket'
+        - type: object
+          properties:
+            customer:
+              $ref: '#/components/schemas/Customer'
+            labels:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+            messages:
+              type: array
+              items:
+                $ref: '#/components/schemas/Message'
+            user:
+              $ref: '#/components/schemas/User'
+            inbox:
+              type: object
+              description: Embedded inbox details.
+              additionalProperties: true
+    TicketUpdate:
+      type: object
+      description: Fields updatable via PATCH.
+      properties:
+        user_id:
+          type: string
+          nullable: true
+        inbox_id:
+          type: string
+        state:
+          type: string
+          enum:
+            - open
+            - hold
+            - closed
+        label_ids:
+          type: array
+          items:
+            type: string
+          description: Set labels to this list; empty array removes all labels.
+        spam:
+          type: boolean
+          description: spam and trash cannot both be true.
+        trash:
+          type: boolean
+          description: spam and trash cannot both be true.
+        subject:
+          type: string
+      additionalProperties: false
+    TicketCreate:
+      type: object
+      description: Create an email-type ticket. Either `customer_id` or `customer` must be provided.
+      properties:
+        type:
+          allOf:
+            - $ref: '#/components/schemas/TicketType'
+          description: Must be `email`.
+          enum:
+            - email
+        subject:
+          type: string
+        customer_id:
+          type: string
+        customer:
+          $ref: '#/components/schemas/CustomerInput'
+        user_id:
+          type: string
+        inbox_id:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageCreate'
+        reply_to:
+          type: string
+          deprecated: true
+          nullable: true
+        reply_cc:
+          type: string
+          deprecated: true
+          nullable: true
+      required:
+        - type
+        - subject
+      oneOf:
+        - required:
+            - customer_id
+        - required:
+            - customer
+      additionalProperties: false
+    Message:
+      type: object
+      description: Message (reply or note) on a ticket.
+      properties:
+        id:
+          type: string
+        from_name:
+          type: string
+          nullable: true
+          description: Display name associated with the message.
+        body:
+          type: string
+        htmlized:
+          type: boolean
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+        user_id:
+          type: string
+          nullable: true
+          description: Id of the user who created the message. null if customer.
+        type:
+          type: string
+          enum:
+            - reply
+            - note
+        created_at:
+          type: string
+          format: date-time
+        direction:
+          type: string
+          nullable: true
+          enum:
+            - in
+            - out
+        from:
+          type: string
+          nullable: true
+          description: Contact information of sender.
+        to:
+          type: string
+          nullable: true
+          description: Contact information of recipient.
+        more_body:
+          type: string
+          nullable: true
+          description: Contains signature if removed from body.
+      required:
+        - id
+        - body
+        - htmlized
+        - type
+        - created_at
+        - attachments
+    MessageCreate:
+      oneOf:
+        - $ref: '#/components/schemas/MessageCreateNote'
+        - $ref: '#/components/schemas/MessageCreateReply'
+      discriminator:
+        propertyName: type
+        mapping:
+          note: '#/components/schemas/MessageCreateNote'
+          reply: '#/components/schemas/MessageCreateReply'
+    MessageCreateNote:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - note
+        user_id:
+          type: string
+        body:
+          type: string
+        htmlized:
+          type: boolean
+        attachment_ids:
+          type: array
+          items:
+            type: string
+      required:
+        - type
+        - user_id
+        - body
+        - htmlized
+      additionalProperties: false
+    MessageCreateInboundReply:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - reply
+        direction:
+          type: string
+          enum:
+            - in
+        from_name:
+          type: string
+        body:
+          type: string
+        htmlized:
+          type: boolean
+        from:
+          type: string
+        to:
+          type: string
+        attachment_ids:
+          type: array
+          items:
+            type: string
+      required:
+        - type
+        - direction
+        - from_name
+        - from
+        - body
+        - htmlized
+      additionalProperties: false
+    MessageCreateOutboundReply:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - reply
+        direction:
+          type: string
+          enum:
+            - out
+        body:
+          type: string
+        htmlized:
+          type: boolean
+        user_id:
+          type: string
+        to:
+          type: string
+        attachment_ids:
+          type: array
+          items:
+            type: string
+      required:
+        - type
+        - direction
+        - body
+        - htmlized
+        - user_id
+        - to
+      additionalProperties: false
+    MessageCreateReply:
+      oneOf:
+        - $ref: '#/components/schemas/MessageCreateInboundReply'
+        - $ref: '#/components/schemas/MessageCreateOutboundReply'
+      discriminator:
+        propertyName: direction
+        mapping:
+          in: '#/components/schemas/MessageCreateInboundReply'
+          out: '#/components/schemas/MessageCreateOutboundReply'
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: File name.
+        size:
+          type: integer
+          description: Size in bytes.
+        type:
+          type: string
+          description: MIME type.
+      required:
+        - id
+        - name
+        - size
+        - type
+    AttachmentCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: File name.
+        type:
+          type: string
+          description: MIME type.
+        data:
+          type: string
+          description: Base64-encoded file bytes.
+          format: byte
+      required:
+        - name
+        - type
+        - data
+      additionalProperties: false
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+        - id
+        - first_name
+        - last_name
+        - email
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contact'
+      required:
+        - id
+        - contacts
+    CustomerInput:
+      type: object
+      properties:
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactInput'
+      additionalProperties: false
+    CustomerCreate:
+      allOf:
+        - $ref: '#/components/schemas/CustomerInput'
+    CustomerUpdate:
+      allOf:
+        - $ref: '#/components/schemas/CustomerInput'
+    ContactType:
+      type: string
+      enum:
+        - email
+        - twitter
+        - phone
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/ContactType'
+        value:
+          type: string
+      required:
+        - id
+        - type
+        - value
+    ContactInput:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/ContactType'
+        value:
+          type: string
+      required:
+        - type
+        - value
+      additionalProperties: false
+    ContactCreate:
+      allOf:
+        - $ref: '#/components/schemas/ContactInput'
