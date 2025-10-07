@@ -15,8 +15,6 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,10 +36,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Redocly CLI
+        run: npm install -g @redocly/cli
+
       - name: Validate OpenAPI spec
-        uses: char0n/swagger-editor-validate@v1
-        with:
-          definition-file: openapi.yaml
+        run: redocly lint openapi.yaml
 
   build:
     name: Build Distribution
@@ -52,8 +51,6 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
